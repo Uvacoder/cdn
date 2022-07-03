@@ -2,7 +2,7 @@ require('dotenv').config()
 
 const fastify = require('fastify')
 const path = require('path')
-const { getTokens, extractToken } = require('./utils')
+const { getFiles, getTokens, extractToken } = require('./utils')
 
 const app = fastify({ logger: process.env.NODE_ENV === 'development' })
 
@@ -116,6 +116,70 @@ app.route({
 			sameSite: 'strict',
 		})
 		reply.send({ access_token })
+	},
+})
+
+app.route({
+	method: 'GET',
+	url: '/data',
+	onRequest: [app.authenticate],
+	schema: {
+		summary: 'Get all files',
+		tags: ['files'],
+		querystring: {
+			type: 'object',
+			properties: {
+				dir: { type: 'string' },
+			},
+		},
+		response: {
+			200: {
+				type: 'object',
+				properties: {
+					files: {
+						type: 'array',
+						items: {
+							type: 'object',
+							properties: {
+								file_path: { type: 'string' },
+								file_type: { type: 'string' },
+								file_name: { type: 'string' },
+							},
+						},
+					},
+				},
+			},
+		},
+	},
+	handler: async (request, reply) => {
+		const { dir } = request.query
+
+		try {
+			const token = extractToken(request)
+			const { user } = await app.jwt.verify(token, {
+				algorithm: 'HS256',
+			})
+			console.log(process.cwd(), !!dir ? `public/${dir}` : 'public')
+
+			if (user.name !== process.env.PUBLIC_KEY) {
+				reply.send({ message: 'Wrong user!' })
+			}
+
+			const files_path = path.join(
+				process.cwd(),
+				!!dir ? `public/${dir}` : 'public'
+			)
+			const data = await getFiles(files_path)
+			reply.send({
+				files: data?.map((file) => ({
+					file_path: file,
+					file_type: file.split('.').pop(),
+					file_name: file.split(/(\\|\/)/g).pop(),
+				})),
+			})
+		} catch (err) {
+			console.log(err)
+		}
 	},
 })
 
