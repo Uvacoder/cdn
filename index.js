@@ -2,9 +2,17 @@ require('dotenv').config()
 
 const fastify = require('fastify')
 const path = require('path')
+const fs = require('fs')
+const multer = require('fastify-multer')
 const { getFiles, getTokens, extractToken } = require('./utils')
 
-const app = fastify({ logger: process.env.NODE_ENV === 'development' })
+const app = fastify()
+
+app.register(multer.contentParser)
+
+app.register(require('@fastify/static'), {
+	root: path.join(__dirname, 'public'),
+})
 
 app.register(require('@fastify/cors'), {
 	origin:
@@ -38,6 +46,28 @@ app.decorate('authenticate_refreshtoken', async function (request, reply) {
 		reply.send(err)
 	}
 })
+
+const storage = multer.diskStorage({
+	destination: (req, file, cb) => {
+		const dir = file.mimetype.split('/')[0]
+		const upload_path = path.join(__dirname, !!dir ? `public/${dir}` : 'public')
+		if (fs.existsSync(upload_path)) {
+			cb(null, upload_path)
+		} else {
+			fs.mkdir(upload_path, (err) => {
+				if (err) {
+					return console.error(err)
+				}
+				cb(null, upload_path)
+			})
+		}
+	},
+	filename: (req, file, cb) => {
+		cb(null, Date.now() + '-' + file.originalname)
+	},
+})
+
+const upload = multer({ storage })
 
 app.route({
 	method: 'GET',
@@ -159,7 +189,6 @@ app.route({
 			const { user } = await app.jwt.verify(token, {
 				algorithm: 'HS256',
 			})
-			console.log(process.cwd(), !!dir ? `public/${dir}` : 'public')
 
 			if (user.name !== process.env.PUBLIC_KEY) {
 				reply.send({ message: 'Wrong user!' })
@@ -180,6 +209,97 @@ app.route({
 		} catch (err) {
 			console.log(err)
 		}
+	},
+})
+
+app.route({
+	method: 'POST',
+	url: '/upload',
+	onRequest: [app.authenticate],
+	schema: {
+		summary: 'Upload file',
+		tags: ['files'],
+		consumes: ['multipart/form-data'],
+		response: {
+			200: {
+				type: 'object',
+				properties: {
+					originalname: { type: 'string' },
+					mimetype: { type: 'string' },
+					path: { type: 'string' },
+					filename: { type: 'string' },
+					size: { type: 'number' },
+				},
+			},
+		},
+	},
+	preHandler: [upload.single('file')],
+	handler: async (request, reply) => {
+		const { originalname, mimetype, path, filename, size } = request.file
+		reply.send({ originalname, mimetype, path, filename, size })
+	},
+})
+
+app.route({
+	method: 'POST',
+	url: '/uploads',
+	onRequest: [app.authenticate],
+	schema: {
+		summary: 'Upload files',
+		tags: ['files'],
+		consumes: ['multipart/form-data'],
+		response: {
+			200: {
+				type: 'array',
+				items: {
+					type: 'object',
+					properties: {
+						originalname: { type: 'string' },
+						mimetype: { type: 'string' },
+						path: { type: 'string' },
+						filename: { type: 'string' },
+						size: { type: 'number' },
+					},
+				},
+			},
+		},
+	},
+	preHandler: [upload.array('files')],
+	handler: async (request, reply) => {
+		const { originalname, mimetype, path, filename, size } = request.file
+		reply.send({ originalname, mimetype, path, filename, size })
+	},
+})
+
+app.route({
+	method: 'POST',
+	url: '/delete',
+	onRequest: [app.authenticate],
+	schema: {
+		summary: 'Delete file',
+		tags: ['files'],
+		body: {
+			type: 'object',
+			properties: {
+				file_path: { type: 'string' },
+			},
+		},
+		response: {
+			200: {
+				type: 'object',
+				properties: {
+					message: { type: 'string' },
+				},
+			},
+		},
+	},
+	handler: async (request, reply) => {
+		fs.unlink(request.body.file_path, (err) => {
+			if (err) {
+				console.log(err)
+			}
+			reply.send({ message: 'File deleted!' })
+		})
 	},
 })
 

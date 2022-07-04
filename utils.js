@@ -24,7 +24,6 @@ const getTokens = async (jwt) => {
 		},
 		{ expiresIn: process.env.ACCESS_TOKEN_LIFE }
 	)
-	console.log(process.env.ACCESS_TOKEN_LIFE)
 	const refresh_token = await jwt.sign(
 		{
 			user: {
