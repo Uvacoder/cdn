@@ -12,6 +12,7 @@ app.register(multer.contentParser)
 
 app.register(require('@fastify/static'), {
 	root: path.join(__dirname, 'public'),
+	prefix: '/static',
 })
 
 app.register(require('@fastify/cors'), {
@@ -68,6 +69,10 @@ const storage = multer.diskStorage({
 })
 
 const upload = multer({ storage })
+
+app.get('/', function (req, reply) {
+	return reply.sendFile('index.html') // serving path.join(__dirname, 'public', 'myHtml.html') directly
+})
 
 app.route({
 	method: 'POST',
@@ -154,24 +159,30 @@ app.route({
 				dir: { type: 'string' },
 			},
 		},
-		// response: {
-		// 	200: {
-		// 		type: 'object',
-		// 		properties: {
-		// 			files: {
-		// 				type: 'array',
-		// 				items: {
-		// 					type: 'object',
-		// 					properties: {
-		// 						file_path: { type: 'string' },
-		// 						file_type: { type: 'string' },
-		// 						file_name: { type: 'string' },
-		// 					},
-		// 				},
-		// 			},
-		// 		},
-		// 	},
-		// },
+		response: {
+			200: {
+				type: 'object',
+				properties: {
+					dirs: {
+						type: 'array',
+						items: {
+							type: 'string',
+						},
+					},
+					files: {
+						type: 'array',
+						items: {
+							type: 'object',
+							properties: {
+								file_path: { type: 'string' },
+								file_type: { type: 'string' },
+								file_name: { type: 'string' },
+							},
+						},
+					},
+				},
+			},
+		},
 	},
 	handler: async (request, reply) => {
 		const { dir } = request.query
