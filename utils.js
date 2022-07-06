@@ -1,6 +1,11 @@
 const fs = require('fs')
 const path = require('path')
 
+const getPaths = async (filePath) => {
+	const file = await fs.promises.readdir(filePath)
+	return file
+}
+
 const getFiles = async (filePath) => {
 	const dir = await fs.promises.readdir(filePath)
 	const files = await Promise.all(
@@ -40,4 +45,4 @@ const extractToken = (request) => {
 	return request.headers.authorization.replace('Bearer ', '')
 }
 
-module.exports = { getFiles, getTokens, extractToken }
+module.exports = { getFiles, getPaths, getTokens, extractToken }

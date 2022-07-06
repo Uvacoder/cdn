@@ -4,7 +4,7 @@ const fastify = require('fastify')
 const path = require('path')
 const fs = require('fs')
 const multer = require('fastify-multer')
-const { getFiles, getTokens, extractToken } = require('./utils')
+const { getFiles, getPaths, getTokens, extractToken } = require('./utils')
 
 const app = fastify()
 
@@ -68,14 +68,6 @@ const storage = multer.diskStorage({
 })
 
 const upload = multer({ storage })
-
-app.route({
-	method: 'GET',
-	url: '/',
-	handler: async (request, reply) => {
-		reply.send({ hello: 'world' })
-	},
-})
 
 app.route({
 	method: 'POST',
@@ -162,24 +154,24 @@ app.route({
 				dir: { type: 'string' },
 			},
 		},
-		response: {
-			200: {
-				type: 'object',
-				properties: {
-					files: {
-						type: 'array',
-						items: {
-							type: 'object',
-							properties: {
-								file_path: { type: 'string' },
-								file_type: { type: 'string' },
-								file_name: { type: 'string' },
-							},
-						},
-					},
-				},
-			},
-		},
+		// response: {
+		// 	200: {
+		// 		type: 'object',
+		// 		properties: {
+		// 			files: {
+		// 				type: 'array',
+		// 				items: {
+		// 					type: 'object',
+		// 					properties: {
+		// 						file_path: { type: 'string' },
+		// 						file_type: { type: 'string' },
+		// 						file_name: { type: 'string' },
+		// 					},
+		// 				},
+		// 			},
+		// 		},
+		// 	},
+		// },
 	},
 	handler: async (request, reply) => {
 		const { dir } = request.query
@@ -198,12 +190,17 @@ app.route({
 				process.cwd(),
 				!!dir ? `public/${dir}` : 'public'
 			)
-			const data = await getFiles(files_path)
+			const paths = await getPaths(files_path)
+			const files = await getFiles(files_path)
 			reply.send({
-				files: data?.map((file) => ({
+				paths,
+				files: files?.map((file) => ({
 					file_path: file,
 					file_type: file.split('.').pop(),
-					file_name: file.split(/(\\|\/)/g).pop(),
+					file_name: file
+						.split(/(\\|\/)/g)
+						.pop()
+						.slice(14),
 				})),
 			})
 		} catch (err) {
@@ -235,8 +232,7 @@ app.route({
 	},
 	preHandler: [upload.single('file')],
 	handler: async (request, reply) => {
-		const { originalname, mimetype, path, filename, size } = request.file
-		reply.send({ originalname, mimetype, path, filename, size })
+		reply.send(request.file)
 	},
 })
 
@@ -266,8 +262,7 @@ app.route({
 	},
 	preHandler: [upload.array('files')],
 	handler: async (request, reply) => {
-		const { originalname, mimetype, path, filename, size } = request.file
-		reply.send({ originalname, mimetype, path, filename, size })
+		reply.send(request.files)
 	},
 })
 
