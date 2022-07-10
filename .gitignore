@@ -4,3 +4,6 @@ frontend
 docs
 client
 app
+server
+temp
+/.gitignore
